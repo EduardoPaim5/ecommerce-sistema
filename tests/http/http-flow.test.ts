@@ -13,14 +13,18 @@ describe("API HTTP", () => {
     await app.close();
   });
 
-  it("executa fluxo de login, carrinho e checkout", async () => {
-    const login = await app.inject({
+  async function login(email: string, senha: string): Promise<string> {
+    const resposta = await app.inject({
       method: "POST",
       url: "/auth/login",
-      payload: { email: seedCredentials.cliente.email, senha: seedCredentials.cliente.senha }
+      payload: { email, senha }
     });
-    expect(login.statusCode).toBe(200);
-    const { token } = login.json<{ token: string }>();
+    expect(resposta.statusCode).toBe(200);
+    return resposta.json<{ token: string }>().token;
+  }
+
+  it("executa fluxo de login, carrinho e checkout", async () => {
+    const token = await login(seedCredentials.cliente.email, seedCredentials.cliente.senha);
 
     const carrinho = await app.inject({
       method: "POST",
@@ -46,7 +50,9 @@ describe("API HTTP", () => {
       }
     });
     expect(checkout.statusCode).toBe(201);
-    expect(checkout.json<{ status: StatusPedido; valorTotal: number }>().status).toBe(StatusPedido.PAGO);
+    expect(checkout.json<{ status: StatusPedido; valorTotal: number }>().status).toBe(
+      StatusPedido.AGUARDANDO_PAGAMENTO
+    );
 
     const pedidos = await app.inject({
       method: "GET",
@@ -58,12 +64,7 @@ describe("API HTTP", () => {
   });
 
   it("protege rotas administrativas", async () => {
-    const login = await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      payload: { email: seedCredentials.cliente.email, senha: seedCredentials.cliente.senha }
-    });
-    const { token } = login.json<{ token: string }>();
+    const token = await login(seedCredentials.cliente.email, seedCredentials.cliente.senha);
 
     const resposta = await app.inject({
       method: "POST",
@@ -73,5 +74,65 @@ describe("API HTTP", () => {
     });
 
     expect(resposta.statusCode).toBe(403);
+  });
+
+  it("permite que o administrador envie pedidos pagos", async () => {
+    const tokenCliente = await login(seedCredentials.cliente.email, seedCredentials.cliente.senha);
+    const tokenAdmin = await login(seedCredentials.admin.email, seedCredentials.admin.senha);
+
+    await app.inject({
+      method: "POST",
+      url: "/carrinho/itens",
+      headers: { authorization: `Bearer ${tokenCliente}` },
+      payload: { produtoId: 1, quantidade: 1 }
+    });
+
+    const checkout = await app.inject({
+      method: "POST",
+      url: "/checkout",
+      headers: { authorization: `Bearer ${tokenCliente}` },
+      payload: {
+        enderecoEntrega: {
+          cep: "01001000",
+          logradouro: "Praca da Se",
+          numero: "100",
+          cidade: "Sao Paulo",
+          estado: "SP"
+        }
+      }
+    });
+    const pedidoId = checkout.json<{ id: number }>().id;
+
+    const pagamento = await app.inject({
+      method: "PATCH",
+      url: `/admin/pedidos/${pedidoId}/pagamento`,
+      headers: { authorization: `Bearer ${tokenAdmin}` },
+      payload: { resultado: "APROVADO" }
+    });
+
+    expect(pagamento.statusCode).toBe(200);
+    expect(pagamento.json<{ status: StatusPedido }>().status).toBe(StatusPedido.PAGO);
+
+    const resposta = await app.inject({
+      method: "PATCH",
+      url: `/admin/pedidos/${pedidoId}/enviar`,
+      headers: { authorization: `Bearer ${tokenAdmin}` }
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json<{ status: StatusPedido }>().status).toBe(StatusPedido.ENVIADO);
+  });
+
+  it("permite que o administrador desative produtos", async () => {
+    const tokenAdmin = await login(seedCredentials.admin.email, seedCredentials.admin.senha);
+
+    const resposta = await app.inject({
+      method: "PATCH",
+      url: "/admin/produtos/1/desativar",
+      headers: { authorization: `Bearer ${tokenAdmin}` }
+    });
+
+    expect(resposta.statusCode).toBe(200);
+    expect(resposta.json<{ ativo: boolean }>().ativo).toBe(false);
   });
 });

@@ -118,7 +118,6 @@ export class ApiClient {
 
   async checkout(input: {
     enderecoEntrega: Pedido["enderecoEntrega"];
-    resultadoPagamento: ResultadoPagamento;
   }): Promise<Pedido> {
     return this.request("/checkout", { method: "POST", body: input });
   }
@@ -160,12 +159,14 @@ export class ApiClient {
   }
 
   private async request<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+    const headers: HeadersInit = {
+      ...(this.token ? { Authorization: `Bearer ${this.token}` } : {})
+    };
+    if (options.body !== undefined) headers["Content-Type"] = "application/json";
+
     const init: RequestInit = {
       method: options.method ?? "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(this.token ? { Authorization: `Bearer ${this.token}` } : {})
-      }
+      headers
     };
     if (options.body !== undefined) init.body = JSON.stringify(options.body);
 

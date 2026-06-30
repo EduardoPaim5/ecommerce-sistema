@@ -19,7 +19,6 @@ import {
   Pedido,
   Produto,
   ProdutoInput,
-  ResultadoPagamento,
   Usuario,
   formatarMoeda
 } from "./api.js";
@@ -408,7 +407,6 @@ function CheckoutView({
   total: number;
   onSubmit: (input: {
     enderecoEntrega: Pedido["enderecoEntrega"];
-    resultadoPagamento: ResultadoPagamento;
   }) => void;
 }) {
   const [endereco, setEndereco] = useState({
@@ -419,8 +417,6 @@ function CheckoutView({
     cidade: "Sao Paulo",
     estado: "SP"
   });
-  const [resultadoPagamento, setResultadoPagamento] = useState<ResultadoPagamento>("APROVADO");
-
   function atualizar(campo: keyof typeof endereco, valor: string) {
     setEndereco((atual) => ({ ...atual, [campo]: valor }));
   }
@@ -432,7 +428,7 @@ function CheckoutView({
         className="form-grid"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit({ enderecoEntrega: endereco, resultadoPagamento });
+          onSubmit({ enderecoEntrega: endereco });
         }}
       >
         {Object.entries(endereco).map(([campo, valor]) => (
@@ -441,16 +437,6 @@ function CheckoutView({
             <input value={valor} onChange={(event) => atualizar(campo as keyof typeof endereco, event.target.value)} />
           </label>
         ))}
-        <label>
-          Pagamento
-          <select
-            value={resultadoPagamento}
-            onChange={(event) => setResultadoPagamento(event.target.value as ResultadoPagamento)}
-          >
-            <option value="APROVADO">Aprovado</option>
-            <option value="RECUSADO">Recusado</option>
-          </select>
-        </label>
         <footer className="total">
           <strong>Total: {formatarMoeda(total)}</strong>
           <button className="primary" type="submit">
@@ -710,46 +696,54 @@ function AdminPedidos({
     <section className="panel">
       <h1>Pedidos Admin</h1>
       <div className="list">
-        {pedidos.map((pedido) => (
-          <article className="row" key={pedido.id}>
-            <div>
-              <strong>#{pedido.id} - {pedido.status}</strong>
-              <span>
-                Cliente {pedido.usuarioId} - {formatarMoeda(pedido.valorTotal)}
-              </span>
-            </div>
-            <button
-              onClick={() =>
-                executar(async () => {
-                  await api.confirmarPagamento(pedido.id, "APROVADO");
-                  await onRefresh();
-                }, "Pagamento aprovado.")
-              }
-            >
-              Aprovar
-            </button>
-            <button
-              onClick={() =>
-                executar(async () => {
-                  await api.confirmarPagamento(pedido.id, "RECUSADO");
-                  await onRefresh();
-                }, "Pagamento recusado.")
-              }
-            >
-              Recusar
-            </button>
-            <button
-              onClick={() =>
-                executar(async () => {
-                  await api.enviarPedido(pedido.id);
-                  await onRefresh();
-                }, "Pedido enviado.")
-              }
-            >
-              Enviar
-            </button>
-          </article>
-        ))}
+        {pedidos.map((pedido) => {
+          const podeAvaliarPagamento = pedido.status === "AGUARDANDO_PAGAMENTO";
+          const podeEnviar = pedido.status === "PAGO";
+
+          return (
+            <article className="row" key={pedido.id}>
+              <div>
+                <strong>#{pedido.id} - {pedido.status}</strong>
+                <span>
+                  Cliente {pedido.usuarioId} - {formatarMoeda(pedido.valorTotal)}
+                </span>
+              </div>
+              <button
+                disabled={!podeAvaliarPagamento}
+                onClick={() =>
+                  executar(async () => {
+                    await api.confirmarPagamento(pedido.id, "APROVADO");
+                    await onRefresh();
+                  }, "Pagamento aprovado.")
+                }
+              >
+                Aprovar
+              </button>
+              <button
+                disabled={!podeAvaliarPagamento}
+                onClick={() =>
+                  executar(async () => {
+                    await api.confirmarPagamento(pedido.id, "RECUSADO");
+                    await onRefresh();
+                  }, "Pagamento recusado.")
+                }
+              >
+                Recusar
+              </button>
+              <button
+                disabled={!podeEnviar}
+                onClick={() =>
+                  executar(async () => {
+                    await api.enviarPedido(pedido.id);
+                    await onRefresh();
+                  }, "Pedido enviado.")
+                }
+              >
+                Enviar
+              </button>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
