@@ -131,10 +131,7 @@ function registrarRotas(app: FastifyInstance, context: AppContext): void {
         estado: string;
       }
     };
-    const resultado = resultadoPagamentoOpcional(body.resultadoPagamento);
-    const pedido = await context.services.checkout.finalizarCompra(
-      resultado === undefined ? checkoutInput : { ...checkoutInput, resultadoPagamento: resultado }
-    );
+    const pedido = await context.services.checkout.finalizarCompra(checkoutInput);
     return reply.code(201).send(serializarPedido(pedido));
   });
 
@@ -300,8 +297,4 @@ function numero(valor: unknown): number {
 function resultadoPagamento(valor: unknown): ResultadoPagamento {
   if (valor === ResultadoPagamento.APROVADO || valor === ResultadoPagamento.RECUSADO) return valor;
   throw new ApplicationError("Resultado de pagamento invalido.", 400);
-}
-
-function resultadoPagamentoOpcional(valor: unknown): ResultadoPagamento | undefined {
-  return valor === undefined ? undefined : resultadoPagamento(valor);
 }

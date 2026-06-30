@@ -25,8 +25,9 @@ export class PedidoService {
   async confirmarPagamento(usuario: Usuario, pedidoId: number, resultado: ResultadoPagamento): Promise<Pedido> {
     this.garantirAdmin(usuario);
     const pedido = await this.obter(usuario, pedidoId);
+    pedido.validarConfirmacaoPagamento();
+    if (resultado === ResultadoPagamento.APROVADO) await this.baixarEstoque(pedido);
     pedido.confirmarPagamento(resultado);
-    if (resultado === ResultadoPagamento.RECUSADO) await this.estornarEstoque(pedido);
     await this.repositories.pedidos.salvar(pedido);
     return pedido;
   }
@@ -50,7 +51,7 @@ export class PedidoService {
     const pedido = await this.obter(usuario, pedidoId);
     const statusAnterior = pedido.status;
     pedido.cancelar();
-    if ([StatusPedido.AGUARDANDO_PAGAMENTO, StatusPedido.PAGO].includes(statusAnterior)) {
+    if (statusAnterior === StatusPedido.PAGO) {
       await this.estornarEstoque(pedido);
     }
     await this.repositories.pedidos.salvar(pedido);
@@ -61,8 +62,37 @@ export class PedidoService {
     if (!usuario.ehAdministrador()) throw new ApplicationError("Acesso restrito a administradores.", 403);
   }
 
+  private async baixarEstoque(pedido: Pedido): Promise<void> {
+    const produtosBaixados: Array<{ produtoId: number; quantidade: number }> = [];
+
+    try {
+      for (const item of pedido.itens) {
+        const produto = await this.repositories.produtos.buscarPorId(item.produtoId);
+        if (produto instanceof Produto) {
+          produto.baixarEstoque(item.quantidade);
+          produtosBaixados.push({ produtoId: produto.id, quantidade: item.quantidade });
+          await this.repositories.produtos.salvar(produto);
+          continue;
+        }
+
+        throw new ApplicationError(`Produto ${item.produtoId} nao encontrado.`, 400);
+      }
+    } catch (error) {
+      await this.estornarProdutos(produtosBaixados);
+      throw error;
+    }
+  }
+
   private async estornarEstoque(pedido: Pedido): Promise<void> {
-    for (const item of pedido.itens) {
+    const itens = pedido.itens.map((item) => ({
+      produtoId: item.produtoId,
+      quantidade: item.quantidade
+    }));
+    await this.estornarProdutos(itens);
+  }
+
+  private async estornarProdutos(itens: Array<{ produtoId: number; quantidade: number }>): Promise<void> {
+    for (const item of itens) {
       const produto = await this.repositories.produtos.buscarPorId(item.produtoId);
       if (produto instanceof Produto) {
         produto.estornarEstoque(item.quantidade);

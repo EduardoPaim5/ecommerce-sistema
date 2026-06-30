@@ -34,8 +34,12 @@ export class Pedido {
   }
 
   confirmarPagamento(resultado: ResultadoPagamento): void {
-    this.garantirStatus(StatusPedido.AGUARDANDO_PAGAMENTO);
+    this.validarConfirmacaoPagamento();
     this.status = resultado === ResultadoPagamento.APROVADO ? StatusPedido.PAGO : StatusPedido.CANCELADO;
+  }
+
+  validarConfirmacaoPagamento(): void {
+    this.garantirStatus(StatusPedido.AGUARDANDO_PAGAMENTO);
   }
 
   enviar(): void {
