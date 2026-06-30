@@ -1,0 +1,38 @@
+{
+  "name": "ecommerce-sistema",
+  "version": "0.1.0",
+  "description": "Base inicial de um sistema web de e-commerce com dominio em TypeScript.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "dev": "tsx watch src/infra/http/server.ts",
+    "dev:api": "tsx watch src/infra/http/server.ts",
+    "dev:frontend": "vite --host 0.0.0.0",
+    "start": "tsx src/infra/http/server.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^24.0.7",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "jsdom": "^29.1.1",
+    "tsx": "^4.22.4",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "fastify": "^5.9.0",
+    "lucide-react": "^1.22.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}
